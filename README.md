@@ -29,9 +29,18 @@ Repositorio para almacenar el código, blueprints, y datasheets de la Estación 
 │   └── emc/
 │       └── emc.ino
 ├── blueprints/
-│   └── pending
+│   ├── complete-model.png
+│   ├── dht11-connection.png
+│   ├── display-connection.png
+│   ├── esp32-connection.png
+│   ├── mq135-connection.png
+│   └── soil-sensor-connection.png
 ├── datasheets/
-│   └── pending
+│   ├── 5461as.pdf
+│   ├── dht11.pdf
+│   ├── esp32-v1-doit.pdf
+│   ├── fc-28.pdf
+│   └── mq135.pdf
 └── README.md
 ```
 
