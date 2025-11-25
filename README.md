@@ -23,6 +23,8 @@ Repositorio para almacenar el código, blueprints, y datasheets de la Estación 
 
 ## Estructura del repositorio
 
+```bash
+.
 ├── arduino/
 │   └── emc/
 │       └── emc.ino
@@ -31,6 +33,7 @@ Repositorio para almacenar el código, blueprints, y datasheets de la Estación 
 ├── datasheets/
 │   └── pending
 └── README.md
+```
 
 ## Integrantes del equipo
 
