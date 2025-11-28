@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .main {
+            display: flex;
+            gap: 20px;
+        }
+
+        body {
+            overflow: hidden;
+            background-color: #f6f6fb;
+        }
+
+        .main>div {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .container.percentaje {
+            width: 320px;
+            border-radius: 3%;
+            font-size: 15px;
+        }
+
+        .graph-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 100%;
+            place-content: center;
+            height: 70%;
+        }
+
+        .big-container {
+            text-align: center;
+            background-color: white;
+            height: auto;
+            width: 95%;
+            box-shadow: 10px 10px 5px lightblue;
+            border-radius: 5%;
+            padding-top: 10px;
+            margin: 0 auto 15px;
+        }
+
+        .graph {
+            box-shadow: 10px 10px 5px lightblue;
+            background-color: aliceblue;
+            border-radius: 10%;
+            padding: 10px;
+        }
+
+        .container {
+            text-align: center;
+            height: 100px;
+            width: 150px;
+            box-shadow: 10px 10px 5px lightblue;
+            border-radius: 20%;
+            padding-top: 10px;
+            margin: 0 auto 15px;
+        }
+
+        .container p {
+            color: white;
+            font-weight: bold;
+            font-family: Arial, Helvetica, sans-serif;
+            display: flex;
+            flex-direction: column;
+
+        }
+
+        h1 {
+            font-weight: bold;
+            text-align: center;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .temperature {
+            background-color: red;
+        }
+
+        .airHumidity {
+            background-color: blue;
+        }
+
+        .airQuality {
+            background-color: gray;
+        }
+
+        .dirtHumidity {
+            background-color: green;
+        }
+
+        @media only screen and (max-width: 600px) {
+
+            body {
+                overflow-y: scroll;
+                overflow-x: hidden;
+            }
+
+            .main {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .graph-container {
+                width: 150px;
+            }
+
+            .percentaje-container {
+                width: auto;
+            }
+
+            .data-container {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+
+            .graph-container {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 20px;
+                width: 100%;
+            }
+
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <h1>Sistema meteorologico casero</h1>
+    </div>
+    <div class="main">
+        <div class="big-container">
+            <h1>Valores actuales</h1>
+            <div class="data-container">
+                <div class="container temperature">
+                    <p>Temperatura: <span id="temperature">--</span></p>
+                </div>
+                <div class="container airHumidity">
+                    <p>Humedad en el Aire: <span id="airHumidity">--</span></p>
+                </div>
+                <div class="container airQuality">
+                    <p>Calidad del aire: <span id="airQuality">--</span></p>
+                    <p id="stateAirQua">--</p>
+                </div>
+                <div class="container dirtHumidity">
+                    <p>Humedad de la tierra: <span id="dirtHumidity">--</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="big-container">
+            <h1>Porcentaje de cambio</h1>
+            <div class="percentaje-container">
+                <div class="container temperature percentaje">
+                    <p id="percentajeTemp">--</p>
+                    <p id="tempText">--</p>
+                </div>
+                <div class="container airHumidity percentaje">
+                    <p id="percentajeAirHum">--</p>
+                    <p id="airHumText">--</p>
+                </div>
+                <div class="container airQuality percentaje">
+                    <p id="percentajeAirQua">--</p>
+                    <p id="airQuaText">--</p>
+                </div>
+                <div class="container dirtHumidity percentaje">
+                    <p id="percentajeDirt">--</p>
+                    <p id="dirtText">--</p>
+                </div>
+            </div>
+        </div>
+        <div class="big-container">
+            <h1>Historial de valores</h1>
+            <div class="graph-container">
+                <div class="graph">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+                <div class="graph">
+                    <canvas id="airHumidityChart"></canvas>
+                </div>
+                <div class="graph">
+                    <canvas id="airQualityChart"></canvas>
+                </div>
+                <div class="graph">
+                    <canvas id="dirtHumidityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let weatherData = [];
+        let temperatureChart, airHumidityChart, airQualityChart, dirtHumidityChart;
+
+        async function getData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    document.getElementById('temperature').innerHTML = data.temperature + " °C"
+                    document.getElementById('airHumidity').innerHTML = data.airHumidity + " %"
+                    let airQua = data.airQuality
+                    let quality = ''
+                    if (airQua < 370) {
+                        quality = 'Buena calidad'
+                        document.getElementById('stateAirQua').innerHTML = quality
+
+                    } else if (airQua < 500) {
+                        quality = 'Calidad media'
+                        document.getElementById('stateAirQua').innerHTML = quality
+
+                    } else {
+                        quality = 'Mala calidad'
+                        document.getElementById('stateAirQua').innerHTML = quality
+
+                    }
+
+                    document.getElementById('airQuality').innerHTML = airQua
+
+                    document.getElementById('dirtHumidity').innerHTML = data.dirtHumidity + " %"
+
+                    weatherData.push(data)
+                    let weatherLen = weatherData.length
+
+                    const tempData = weatherData.map(v => v.temperature)
+                    const airHumData = weatherData.map(v => v.airHumidity)
+                    const airQuaData = weatherData.map(v => v.airQuality)
+                    const dirtData = weatherData.map(v => v.dirtHumidity)
+
+                    temperatureChart.data.datasets[0].data = tempData
+                    airHumidityChart.data.datasets[0].data = airHumData
+                    airQualityChart.data.datasets[0].data = airQuaData
+                    dirtHumidityChart.data.datasets[0].data = dirtData
+
+                    if (weatherLen > 0) {
+                        temperatureChart.options.scales.y.min = Math.min(...tempData) - 3
+                        temperatureChart.options.scales.y.max = Math.max(...tempData) + 3
+
+                        airHumidityChart.options.scales.y.max = Math.min(...airHumData) - 3
+                        airHumidityChart.options.scales.y.max = Math.max(...airHumData) + 3
+
+                        airQualityChart.options.scales.y.max = Math.min(...airQuaData) - 3
+                        airQualityChart.options.scales.y.max = Math.max(...airQuaData) + 3
+
+                        dirtHumidityChart.options.scales.y.max = Math.min(...dirtData) - 3
+                        dirtHumidityChart.options.scales.y.max = Math.max(...dirtData) + 3
+                    }
+
+                    if (weatherLen > 1) {
+                        tempDiference = getPercentaje('temperature', weatherData, weatherLen)
+                        document.getElementById('percentajeTemp').innerHTML = tempDiference + " %"
+
+                        let tempText = getPercentajeText('temperatura', tempDiference)
+                        document.getElementById('tempText').innerHTML = tempText
+
+                        airHumDiference = getPercentaje('airHumidity', weatherData, weatherLen)
+                        document.getElementById('percentajeAirHum').innerHTML = airHumDiference + " %"
+
+                        let airHumText = getPercentajeText('humedad', airHumDiference)
+                        document.getElementById('airHumText').innerHTML = airHumText
+
+                        airQuaDiference = getPercentaje('airQuality', weatherData, weatherLen)
+                        document.getElementById('percentajeAirQua').innerHTML = airQuaDiference + " %"
+
+                        let airQuaText = getPercentajeText('calidad del aire', airQuaDiference)
+                        document.getElementById('airQuaText').innerHTML = airQuaText
+
+                        dirtDiference = getPercentaje('dirtHumidity', weatherData, weatherLen)
+                        document.getElementById('percentajeDirt').innerHTML = dirtDiference + " %"
+
+                        let dirtText = getPercentajeText('humedad de la tierra', dirtDiference)
+                        document.getElementById('dirtText').innerHTML = dirtText
+                    }
+                })
+                .catch(console.error);
+        }
+
+        function getPercentajeText(type, diference) {
+            if (diference == 0) {
+                return 'No ha habido cambios en la ' + type + ' desde la primera medición'
+            } else if (diference > 0) {
+                return 'Mas ' + type + ' desde la primera medición'
+            } else if (diference < 0) {
+                return 'Menos ' + type + ' desde la primera medición'
+            }
+            return ''
+        }
+
+        //Esto me lo robe de la pagina de js para redondear el porcentaje 
+        function decimalAdjust(type, value, exp) {
+            // Si el exp no está definido o es cero...
+            if (typeof exp === "undefined" || +exp === 0) {
+                return Math[type](value);
+            }
+            value = +value;
+            exp = +exp;
+            // Si el valor no es un número o el exp no es un entero...
+            if (isNaN(value) || !(typeof exp === "number" && exp % 1 === 0)) {
+                return NaN;
+            }
+            // Shift
+            value = value.toString().split("e");
+            value = Math[type](+(value[0] + "e" + (value[1] ? +value[1] - exp : -exp)));
+            // Shift back
+            value = value.toString().split("e");
+            return +(value[0] + "e" + (value[1] ? +value[1] + exp : exp));
+        }
+
+        Math.round10 = function (value, exp) {
+            return decimalAdjust("round", value, exp);
+        };
+
+        function getPercentaje(type, totalData, len) {
+            a = totalData[0][type]
+            if (a == 0) {
+                return 0;
+            }
+            let b = 0
+            for (let i = 1; i < len; i++) {
+                b += totalData[i][type]
+            }
+            b = b / (len - 1)
+            diference = ((b - a) / a) * 100
+            return Math.round10(diference, -1)
+        }
+
+        function refeshCharts() {
+            temperatureChart.update();
+            airHumidityChart.update();
+            airQualityChart.update();
+            dirtHumidityChart.update();
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+
+            const temperatureCanva = document.getElementById('temperatureChart');
+            temperatureChart = new Chart(temperatureCanva, {
+                type: 'line',
+                data: {
+                    labels: Array(10).fill(''),
+                    datasets: [{
+                        label: 'Grados centigrados',
+                        data: [],
+                        borderWidth: 1,
+                        borderColor: '#FF0000',
+                        backgroundColor: '#FF0000'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Temperatura' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+
+                        }
+                    }
+                }
+            });
+
+            const airHumidityCanva = document.getElementById('airHumidityChart');
+            airHumidityChart = new Chart(airHumidityCanva, {
+                type: 'line',
+                data: {
+                    labels: Array(10).fill(''),
+                    datasets: [{
+                        label: 'Humedad Aire',
+                        data: [],
+                        borderWidth: 1,
+                        borderColor: '#0000FF',
+                        backgroundColor: '#0000FF'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Humedad en el aire' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            const airQualityCanva = document.getElementById('airQualityChart');
+            airQualityChart = new Chart(airQualityCanva, {
+                type: 'line',
+                data: {
+                    labels: Array(10).fill(''),
+                    datasets: [{
+                        label: 'Calidad Aire',
+                        data: [],
+                        borderWidth: 2,
+                        borderColor: '#808080',
+                        backgroundColor: '#808080',
+                        stepped: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Calidad del aire' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            const dirtHumidityCanva = document.getElementById('dirtHumidityChart');
+            dirtHumidityChart = new Chart(dirtHumidityCanva, {
+                type: 'bar',
+                data: {
+                    labels: Array(10).fill(''),
+                    datasets: [{
+                        label: 'Humedad Tierra',
+                        data: [],
+                        borderWidth: 1,
+                        borderColor: '#008000',
+                        backgroundColor: '#008000'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Humedad de la tierra' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            setInterval(() => {
+                getData();
+                refeshCharts();
+            }, 5000);
+
+            getData();
+        });
+    </script>
+
+</body>
+
+</html>

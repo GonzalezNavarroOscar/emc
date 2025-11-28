@@ -1,4 +1,18 @@
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ArduinoJson.h>
+#include <ESPAsyncWebServer.h>
+#include "FS.h"
 #include "DHT.h"
+#include "LittleFS.h"
+
+// ---------------------------
+// Configuracion wifi
+// ---------------------------
+const char* ssid = "Pixel";
+const char* password = "andres12345";
+
+AsyncWebServer server(80);
 
 // ---------------------------
 // Pines del MQ135, DHT11 y FC-28 (solo A0)
@@ -43,6 +57,11 @@ int soilMoistureRaw = 0;
 unsigned long lastReadingTime = 0;
 const unsigned long READING_INTERVAL = 5000;
 
+unsigned long lastDisplayTime = 0;
+const unsigned long DISPLAY_INTERVAL = 2;  // 2 ms por dígito
+int currentDigit = 0;
+int d[4];
+
 // ---------------------------
 // Valores calibrados del FC-28
 // ---------------------------
@@ -61,7 +80,6 @@ int readFC28Moisture() {
 
   for (int i = 0; i < samples; i++) {
     sum += analogRead(SOIL_MOISTURE_PIN);
-    delay(1);
   }
 
   soilMoistureRaw = sum / samples;
@@ -78,6 +96,32 @@ int readFC28Moisture() {
 // ---------------------------
 void setup() {
   Serial.begin(115200);
+  if(!LittleFS.begin(true)){   // true = formatea si falla
+    Serial.println("Error al montar LittleFS");
+    return;
+  }
+  Serial.println("LittleFS montado correctamente");
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) 
+  {
+    delay(500);
+    Serial.print('.');
+  }
+  
+  Serial.println(WiFi.localIP());
+  //Aqui se crea la pagina web que se subio con el littlefs 
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(LittleFS, "/index.html", "text/html");
+  });
+
+  //Esta es una funcion que toma el javascript para jalar los datos de aqui
+  server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request){
+  String json = createJson();
+  request->send(200, "application/json", json);
+  });
+
+  server.begin();
   dht.begin();
 
   for (int i = 0; i < 8; i++) {
@@ -91,6 +135,20 @@ void setup() {
 
   pinMode(MQ_135, INPUT);
   pinMode(SOIL_MOISTURE_PIN, INPUT);
+}
+
+// ---------------------------
+// Crear JSON
+// ---------------------------
+String createJson(){
+  StaticJsonDocument<200> jsonData;
+  jsonData["temperature"] = currentTempC;
+  jsonData["airHumidity"] = airHumidity;
+  jsonData["airQuality"] = filteredValue;
+  jsonData["dirtHumidity"] = soilMoisture;
+  String finalJson;
+  serializeJson(jsonData, finalJson);
+  return finalJson;
 }
 
 // ---------------------------
@@ -153,44 +211,46 @@ void displayDigit(int number, int position, bool decimalPoint) {
 }
 
 void updateDisplay() {
-  int d[4];
-  int tempInt = (int)(currentTempC * 10);
+  if (millis() - lastDisplayTime >= DISPLAY_INTERVAL) {
+    lastDisplayTime = millis();
 
-  if (currentTempC >= 10.0 && currentTempC < 100.0) {
-    d[0] = (tempInt / 100) % 10;
-    d[1] = (tempInt / 10) % 10;
-    d[2] = tempInt % 10;
-    d[3] = 11;
-  }
-  else if (currentTempC < 10.0) {
-    d[0] = 10;
-    d[1] = (tempInt / 100) % 10;
-    d[2] = (tempInt / 10) % 10;
-    d[3] = 11;
-  }
-  else {
-    int ti = (int)currentTempC;
-    d[0] = ti / 100;
-    d[1] = (ti / 10) % 10;
-    d[2] = ti % 10;
-    d[3] = 11;
-  }
+    int tempInt = (int)(currentTempC * 10);
 
-  for (int cycles = 0; cycles < 5; cycles++) {
-    for (int digit = 0; digit < 4; digit++) {
-      bool decimalPoint = false;
-
-      if (currentTempC >= 10.0 && currentTempC < 100.0)
-        decimalPoint = (digit == 1);
-      else if (currentTempC < 10.0)
-        decimalPoint = (digit == 0);
-
-      displayDigit(d[digit], digit, decimalPoint);
-      delay(2);
-      displayDigit(10, digit); 
+    if (currentTempC >= 10.0 && currentTempC < 100.0) {
+      d[0] = (tempInt / 100) % 10;
+      d[1] = (tempInt / 10) % 10;
+      d[2] = tempInt % 10;
+      d[3] = 11;
+    } 
+    else if (currentTempC < 10.0) {
+      d[0] = 10;
+      d[1] = (tempInt / 100) % 10;
+      d[2] = (tempInt / 10) % 10;
+      d[3] = 11;
+    } 
+    else {
+      int ti = (int)currentTempC;
+      d[0] = ti / 100;
+      d[1] = (ti / 10) % 10;
+      d[2] = ti % 10;
+      d[3] = 11;
     }
+
+    for (int i = 0; i < 4; i++)
+      digitalWrite(digitPins[i], HIGH);
+
+    bool decimalPoint = false;
+    if (currentTempC >= 10.0 && currentTempC < 100.0)
+      decimalPoint = (currentDigit == 1);
+    else if (currentTempC < 10.0)
+      decimalPoint = (currentDigit == 0);
+
+    displayDigit(d[currentDigit], currentDigit, decimalPoint);
+
+    currentDigit = (currentDigit + 1) % 4;
   }
 }
+
 
 // ---------------------------
 // Loop
